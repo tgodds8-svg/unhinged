@@ -604,4 +604,14 @@ function buildPrompt() {
 // ===== IMAGE PROMPT =====
 function toImage(boxId) {
   const text = document.getElementById(boxId).value.trim();
-  if (!text) { showToast('Box is
+  if (!text) { showToast('Box is empty!'); return; }
+
+  const prompt = `Create a vivid, cinematic image depicting this scene from a dark fiction story:
+
+${text}
+
+Style: photorealistic, dramatic lighting, highly detailed, no text, no watermarks.`;
+
+  document.getElementById('chained-prompt').textContent = prompt;
+  showToast('Image prompt ready!');
+}
