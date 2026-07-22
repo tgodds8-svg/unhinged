@@ -1,13 +1,38 @@
 /* Fix: reset unexpected negative top offset that was clipping page content
-   and add sr-only utility class for accessibility live regions.
+   and implement a robust sticky-header spacing approach using a CSS variable.
 
    File: styles/fix-header-offset.css
 */
 
+/* CSS variable for header height so spacing stays consistent across the layout. */
+:root {
+  --site-header-height: 100px; /* adjust if your header height differs */
+}
+
+/* Reset any previously applied negative offset on the logged-in wrapper */
 body > div.logged-in.env-production.page-responsive {
-  /* reset unexpected negative offset that was clipping page content */
   position: relative;
   top: 0;
+}
+
+/* Make the header sticky so it stays at the top without using negative offsets
+   and ensure it sits above page content. */
+.header-wrapper {
+  position: sticky;
+  top: 0;
+  z-index: 50; /* ensure it stays on top of other content */
+  height: var(--site-header-height);
+}
+
+/* Offset the main application content by the header height so it's not
+   obscured when the header is fixed/sticky. */
+.application-main {
+  margin-top: var(--site-header-height);
+}
+
+/* Responsive tweak: reduce header height on small screens */
+@media (max-width: 640px) {
+  :root { --site-header-height: 56px; }
 }
 
 /* Utility for screen-reader-only content (use for live regions / notices) */
