@@ -1,357 +1,69 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>UNHINGED // Story Engine</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    background: #0a0a0f;
-    color: #e0e0e0;
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    min-height: 100vh;
-    padding: 12px;
+// ==========================================
+// UNHINGED LOCAL ENGINE CORE LOGIC
+// ==========================================
+const LINE_SEP = /\r?\n/;
+const PART_SEP = /:|-/;
+const MAX_INPUT_CHARS = 10000;
+
+const TEMPLATES = [
+  (name, desc) => `${name} ${desc}. They called ${name} ${desc.toLowerCase()}.`,
+  (name, desc) => `${name} looked at the edge of everything, watching.`,
+  (name, desc) => `${name} had the look of someone who ${desc.toLowerCase()}`
+];
+
+function generateCharacterIntro(characters, setting) {
+  if (!characters || !characters.trim()) {
+    return "The characters moved through this place like ghosts haunting their own lives.";
   }
-  h1 {
-    text-align: center;
-    color: #ff3366;
-    font-size: 1.4rem;
-    margin-bottom: 8px;
-    text-shadow: 0 0 10px #ff3366;
+
+  let input = characters;
+  if (input.length > MAX_INPUT_CHARS) {
+    input = input.slice(0, MAX_INPUT_CHARS);
   }
-  .subtitle {
-    text-align: center;
-    color: #666;
-    font-size: 0.75rem;
-    margin-bottom: 16px;
+
+  const lines = input.split(LINE_SEP).map(l => l.trim()).filter(Boolean);
+  const out = new Array(lines.length);
+
+  for (let i = 0; i < lines.length; i++) {
+    const parts = lines[i].split(PART_SEP).map(p => p.trim());
+    const name = parts[0] || "Someone";
+    const desc = parts[1] || "a figure of mystery";
+    const tpl = TEMPLATES[i % TEMPLATES.length];
+    out[i] = tpl(name, desc);
   }
-  .panel {
-    background: #111118;
-    border: 1px solid #222;
-    border-radius: 10px;
-    padding: 12px;
-    margin-bottom: 12px;
+
+  return out.join("\n\n");
+}
+
+// ==========================================
+// UI NAVIGATION & ROUTING BRIDGE
+// ==========================================
+let currentMode = 'local';
+
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById('mode-local').classList.toggle('active', mode === 'local');
+  document.getElementById('mode-api').classList.toggle('active', mode === 'api');
+  document.getElementById('api-fields').classList.toggle('hidden', mode === 'local');
+  document.getElementById('local-info').classList.toggle('hidden', mode === 'api');
+}
+
+// Global button function called directly by HTML click attributes
+function aiGen(type) {
+  if (currentMode === 'local') {
+    if (type === 'characters') {
+      const inputData = document.getElementById('characters').value;
+      const settingData = document.getElementById('setting').value;
+      
+      // Calculate layout text via local algorithm
+      const result = generateCharacterIntro(inputData, settingData);
+      
+      // Print template text straight into the box view
+      document.getElementById('characters').value = result;
+    } else {
+      alert(`Local template algorithm for "${type}" triggered. Expand template definitions to support this field.`);
+    }
+  } else {
+    console.log(`Routing an external API pipeline request for block element: ${type}`);
   }
-  .panel-title {
-    color: #ff3366;
-    font-size: 0.85rem;
-    font-weight: bold;
-    margin-bottom: 8px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  label {
-    display: block;
-    font-size: 0.75rem;
-    color: #888;
-    margin-bottom: 4px;
-    margin-top: 8px;
-  }
-  input, textarea, select {
-    width: 100%;
-    background: #1a1a24;
-    border: 1px solid #333;
-    border-radius: 6px;
-    color: #e0e0e0;
-    padding: 8px 10px;
-    font-size: 0.85rem;
-    font-family: inherit;
-  }
-  input:focus, textarea:focus, select:focus {
-    outline: none;
-    border-color: #ff3366;
-  }
-  textarea { resize: vertical; min-height: 60px; }
-  .row { display: flex; gap: 8px; }
-  .row > * { flex: 1; }
-  button {
-    background: #ff3366;
-    color: #fff;
-    border: none;
-    border-radius: 6px;
-    padding: 8px 14px;
-    font-size: 0.8rem;
-    font-weight: bold;
-    cursor: pointer;
-    margin-top: 8px;
-    transition: background 0.2s;
-  }
-  button:hover { background: #ff5588; }
-  button.secondary {
-    background: #222;
-    border: 1px solid #444;
-    color: #aaa;
-  }
-  button.secondary:hover { background: #333; }
-  .btn-small {
-    padding: 4px 10px;
-    font-size: 0.7rem;
-    margin-top: 0;
-    margin-left: auto;
-  }
-  .status {
-    font-size: 0.75rem;
-    margin-top: 6px;
-    padding: 4px 8px;
-    border-radius: 4px;
-    display: none;
-  }
-  .status.ok { background: #1a3a1a; color: #4caf50; }
-  .status.err { background: #3a1a1a; color: #f44336; }
-  .status.warn { background: #3a3a1a; color: #ff9800; }
-  .story-box {
-    margin-bottom: 12px;
-  }
-  .box-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 4px;
-  }
-  .box-label {
-    font-size: 0.8rem;
-    color: #aaa;
-    font-weight: 600;
-  }
-  .output-area {
-    background: #0d0d14;
-    border: 1px solid #333;
-    border-radius: 6px;
-    padding: 10px;
-    min-height: 100px;
-    max-height: 300px;
-    overflow-y: auto;
-    font-size: 0.85rem;
-    line-height: 1.5;
-    white-space: pre-wrap;
-    margin-bottom: 12px;
-  }
-  .hidden { display: none !important; }
-  .active { background: #ff3366 !important; }
-  .toast {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background: #222;
-    color: #fff;
-    padding: 12px 16px;
-    border-radius: 6px;
-    display: none;
-    z-index: 999;
-    border-left: 3px solid #ff3366;
-  }
-  .container {
-    max-width: 1200px;
-    margin: 0 auto;
-  }
-  .grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-  }
-  @media (max-width: 768px) {
-    .grid { grid-template-columns: 1fr; }
-  }
-  .world-btn, .branch-btn {
-    background: #222;
-    border: 1px solid #444;
-    padding: 8px 10px;
-    border-radius: 6px;
-    color: #aaa;
-    cursor: pointer;
-    margin-right: 6px;
-    margin-bottom: 6px;
-    position: relative;
-  }
-  .world-btn.active { background: #ff3366; color: #fff; }
-  .delete-btn {
-    position: absolute;
-    top: 2px;
-    right: 4px;
-    cursor: pointer;
-    color: #f44336;
-    font-weight: bold;
-  }
-  .timeline-entry {
-    background: #1a1a24;
-    padding: 8px;
-    margin-bottom: 8px;
-    border-left: 3px solid #ff3366;
-    font-size: 0.75rem;
-  }
-</style>
-</head>
-<body>
-
-<div class="container">
-  <h1>⚡ UNHINGED ⚡</h1>
-  <div class="subtitle">A dark fiction story engine with local & API generation modes</div>
-
-  <!-- MODE SELECTOR -->
-  <div class="panel">
-    <div class="panel-title">🎛️ Generation Mode</div>
-    <div class="row">
-      <button id="mode-local" class="secondary active" onclick="setMode('local')">Local AI</button>
-      <button id="mode-api" class="secondary" onclick="setMode('api')">API Mode</button>
-    </div>
-  </div>
-
-  <!-- API CONFIGURATION -->
-  <div id="api-fields" class="panel hidden">
-    <div class="panel-title">🔌 API Configuration</div>
-    
-    <label>Provider</label>
-    <select id="provider" onchange="switchProvider()">
-      <option value="grok">Grok (X.AI)</option>
-      <option value="openrouter">OpenRouter</option>
-      <option value="ollama">Ollama (Local)</option>
-      <option value="custom">Custom Endpoint</option>
-    </select>
-
-    <div id="grok-fields">
-      <label>API Key (Grok)</label>
-      <input id="api-key" type="password" placeholder="sk-...">
-    </div>
-
-    <div id="ollama-fields" class="hidden">
-      <label>Ollama URL</label>
-      <input id="ollama-url" type="text" placeholder="http://localhost:11434" value="http://localhost:11434">
-      <label>Model Name</label>
-      <input id="ollama-model" type="text" placeholder="llama3" value="llama3">
-    </div>
-
-    <label>API URL</label>
-    <input id="api-url" type="text" placeholder="https://api.x.ai/v1/chat/completions">
-    <label>Model Name</label>
-    <input id="model-name" type="text" placeholder="grok-2">
-
-    <div class="row">
-      <button onclick="testConnection()">Test Connection</button>
-    </div>
-    <div id="conn-status" class="status"></div>
-  </div>
-
-  <!-- LOCAL INFO -->
-  <div id="local-info" class="panel">
-    <div class="panel-title">💡 Local Mode Active</div>
-    <p style="font-size: 0.8rem; color: #888;">Using template-based story generation. Switch to API mode to use advanced AI models.</p>
-  </div>
-
-  <!-- WORLD MANAGEMENT -->
-  <div class="panel">
-    <div class="panel-title">🌍 Worlds</div>
-    <div id="worlds" style="margin-bottom: 8px;"></div>
-    <button class="secondary" onclick="createWorld()">+ New World</button>
-  </div>
-
-  <!-- STORY BUILDER -->
-  <div class="panel">
-    <div class="panel-title">📖 Story Elements</div>
-
-    <div class="story-box">
-      <div class="box-header">
-        <span class="box-label">PREMISE</span>
-        <button class="btn-small" onclick="aiGen('premise')">Generate</button>
-      </div>
-      <textarea id="premise" placeholder="What's the core hook of your story?"></textarea>
-    </div>
-
-    <div class="story-box">
-      <div class="box-header">
-        <span class="box-label">CHARACTERS</span>
-        <button class="btn-small" onclick="aiGen('characters')">Generate</button>
-      </div>
-      <textarea id="characters" placeholder="List characters (Name: Description)"></textarea>
-    </div>
-
-    <div class="story-box">
-      <div class="box-header">
-        <span class="box-label">SETTING</span>
-        <button class="btn-small" onclick="aiGen('setting')">Generate</button>
-      </div>
-      <textarea id="setting" placeholder="Describe the world/location..."></textarea>
-    </div>
-
-    <div class="story-box">
-      <div class="box-header">
-        <span class="box-label">CONFLICT</span>
-        <button class="btn-small" onclick="aiGen('conflict')">Generate</button>
-      </div>
-      <textarea id="conflict" placeholder="What's the main tension?"></textarea>
-    </div>
-
-    <div class="story-box">
-      <div class="box-header">
-        <span class="box-label">SCENES</span>
-        <button class="btn-small" onclick="aiGen('scenes')">Generate</button>
-      </div>
-      <textarea id="scenes" placeholder="Outline key scenes..."></textarea>
-    </div>
-
-    <div class="story-box">
-      <div class="box-header">
-        <span class="box-label">TONE & STYLE</span>
-        <button class="btn-small" onclick="aiGen('tone')">Generate</button>
-      </div>
-      <textarea id="tone" placeholder="Gothic? Visceral? Dreamlike?"></textarea>
-    </div>
-
-    <div class="story-box">
-      <div class="box-header">
-        <span class="box-label">CONSTRAINTS</span>
-        <button class="btn-small" onclick="aiGen('constraints')">Generate</button>
-      </div>
-      <textarea id="constraints" placeholder="Any rules or restrictions for the story?"></textarea>
-    </div>
-
-    <div class="row">
-      <button onclick="generateStory()">🔥 GENERATE STORY</button>
-      <button class="secondary" onclick="buildPrompt()">Build Prompt</button>
-      <button class="secondary" onclick="toImage('premise')">Image Prompt</button>
-    </div>
-  </div>
-
-  <!-- OUTPUT -->
-  <div class="panel">
-    <div class="panel-title">✍️ Generated Story</div>
-    <div id="output" class="output-area">Fill the boxes above and hit GENERATE to create your story.</div>
-    <div class="row">
-      <button onclick="continueStory()">Continue Story</button>
-      <button class="secondary" onclick="branchOff()">Branch Off</button>
-    </div>
-  </div>
-
-  <!-- PROMPT DISPLAY -->
-  <div class="panel hidden">
-    <div class="panel-title">🔗 Chained Prompt</div>
-    <div id="chained-prompt" class="output-area" style="max-height: 200px;"></div>
-  </div>
-
-  <!-- IMAGE PROMPT -->
-  <div class="panel hidden">
-    <div class="panel-title">🖼️ Image Prompt</div>
-    <textarea id="image-prompt" class="output-area" style="resize: vertical;"></textarea>
-  </div>
-
-  <!-- TIMELINE & BRANCHES -->
-  <div class="grid">
-    <div class="panel">
-      <div class="panel-title">📚 Timeline</div>
-      <div id="timeline" style="max-height: 300px; overflow-y: auto;"></div>
-    </div>
-    <div class="panel">
-      <div class="panel-title">🌳 Branches</div>
-      <div id="branches" style="max-height: 300px; overflow-y: auto;"></div>
-    </div>
-  </div>
-
-</div>
-
-<!-- TOAST NOTIFICATION -->
-<div id="toast" class="toast"></div>
-
-<script src="engine.js"></script>
-</body>
-</html>
+}
