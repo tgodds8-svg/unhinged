@@ -26,8 +26,11 @@ function generateCharacterIntro(characters, setting) {
 
   for (let i = 0; i < lines.length; i++) {
     const parts = lines[i].split(PART_SEP).map(p => p.trim());
+    
+    // Explicit array indexes to prevent raw data-array dumps
     const name = parts[0] || "Someone";
     const desc = parts[1] || "a figure of mystery";
+    
     const tpl = TEMPLATES[i % TEMPLATES.length];
     out[i] = tpl(name, desc);
   }
@@ -36,7 +39,7 @@ function generateCharacterIntro(characters, setting) {
 }
 
 // ==========================================
-// UI NAVIGATION & ROUTING BRIDGE
+// UI NAVIGATION & INTERFACE ROUTING BRIDGE
 // ==========================================
 let currentMode = 'local';
 
@@ -48,23 +51,19 @@ function setMode(mode) {
   document.getElementById('local-info').classList.toggle('hidden', mode === 'api');
 }
 
-// Global button function called directly by HTML click attributes
+// Global button router connecting HTML layouts directly to the function logic
 function aiGen(type) {
   if (currentMode === 'local') {
     if (type === 'characters') {
       const inputData = document.getElementById('characters').value;
       const settingData = document.getElementById('setting').value;
       
-      // Calculate layout text via local algorithm
       const result = generateCharacterIntro(inputData, settingData);
-      
-      // Print template text straight into the box view
       document.getElementById('characters').value = result;
     } else {
-      alert(`Local template algorithm for "${type}" triggered. Expand template definitions to support this field.`);
+      alert(`Local template algorithm for "${type}" triggered. Expand template definitions inside engine.js to process this field.`);
     }
   } else {
     console.log(`Routing an external API pipeline request for block element: ${type}`);
   }
 }
-
