@@ -1,4 +1,6 @@
-// Optimized generateCharacterIntro with hoisted constants, templates, and debounce helper
+// ==========================================
+// UNHINGED LOCAL ENGINE CORE LOGIC
+// ==========================================
 const LINE_SEP = /\r?\n/;
 const PART_SEP = /:|-/;
 const MAX_INPUT_CHARS = 10000;
@@ -10,12 +12,10 @@ const TEMPLATES = [
 ];
 
 function generateCharacterIntro(characters, setting) {
-  // Fast-path for empty input
   if (!characters || !characters.trim()) {
     return "The characters moved through this place like ghosts haunting their own lives.";
   }
 
-  // Enforce a soft input limit to avoid extreme allocations
   let input = characters;
   if (input.length > MAX_INPUT_CHARS) {
     input = input.slice(0, MAX_INPUT_CHARS);
@@ -32,25 +32,39 @@ function generateCharacterIntro(characters, setting) {
     out[i] = tpl(name, desc);
   }
 
-  // join once
   return out.join("\n\n");
 }
 
-// Simple debounce helper exposed for the page to use for live previews.
-function debounce(fn, wait) {
-  let t = null;
-  return function(...args) {
-    if (t) clearTimeout(t);
-    t = setTimeout(() => fn.apply(this, args), wait);
-  };
+// ==========================================
+// UI NAVIGATION & ROUTING BRIDGE
+// ==========================================
+let currentMode = 'local';
+
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById('mode-local').classList.toggle('active', mode === 'local');
+  document.getElementById('mode-api').classList.toggle('active', mode === 'api');
+  document.getElementById('api-fields').classList.toggle('hidden', mode === 'local');
+  document.getElementById('local-info').classList.toggle('hidden', mode === 'api');
 }
 
-// A small convenience that updates an output element with a debounced preview
-const debouncedPreview = debounce((inputId, outputId) => {
-  const el = document.getElementById(inputId);
-  const out = document.getElementById(outputId);
-  if (!el || !out) return;
-  const preview = generateCharacterIntro(el.value);
-  // preserve whitespace in output container (expects CSS white-space: pre-wrap)
-  out.textContent = preview;
-}, 250);
+// Global button function called directly by HTML click attributes
+function aiGen(type) {
+  if (currentMode === 'local') {
+    if (type === 'characters') {
+      const inputData = document.getElementById('characters').value;
+      const settingData = document.getElementById('setting').value;
+      
+      // Calculate layout text via local algorithm
+      const result = generateCharacterIntro(inputData, settingData);
+      
+      // Print template text straight into the box view
+      document.getElementById('characters').value = result;
+    } else {
+      alert(`Local template algorithm for "${type}" triggered. Expand template definitions to support this field.`);
+    }
+  } else {
+    console.log(`Routing an external API pipeline request for block element: ${type}`);
+  }
+}
+
